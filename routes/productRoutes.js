@@ -5,6 +5,9 @@ const Product = require("../models/Product");
 // Get all products with pagination, sorting, and filtering
 router.get("/", async (req, res) => {
   try {
+    // Set timeout for the query
+    const queryTimeout = 10000; // 10 seconds
+
     // Pagination
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -40,14 +43,30 @@ router.get("/", async (req, res) => {
       });
     }
 
-    // Execute query with pagination, filtering, and sorting
-    const products = await Product.find(filter)
+    // Execute query with timeout
+    const queryPromise = Product.find(filter)
       .sort(sort)
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .lean()
+      .exec();
 
-    // Get total count for pagination
-    const total = await Product.countDocuments(filter);
+    const countPromise = Product.countDocuments(filter);
+
+    const [products, total] = await Promise.all([
+      Promise.race([
+        queryPromise,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Query timeout")), queryTimeout)
+        ),
+      ]),
+      Promise.race([
+        countPromise,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Count timeout")), queryTimeout)
+        ),
+      ]),
+    ]);
 
     res.status(200).json({
       products,
@@ -65,38 +84,50 @@ router.get("/", async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Error fetching products:", error);
+    res.status(500).json({
+      message: "Error fetching products",
+      error: error.message,
+    });
   }
 });
 
 // Get a specific product by ID
 router.get("/:id", async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const product = await Product.findById(req.params.id).lean().exec();
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
     res.status(200).json(product);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Error fetching product:", error);
+    res.status(500).json({
+      message: "Error fetching product",
+      error: error.message,
+    });
   }
 });
 
 // Create a new product
 router.post("/", async (req, res) => {
-  const product = new Product({
-    name: req.body.name,
-    price: req.body.price,
-    category: req.body.category,
-    stock: req.body.stock,
-    description: req.body.description,
-  });
-
   try {
+    const product = new Product({
+      name: req.body.name,
+      price: req.body.price,
+      category: req.body.category,
+      stock: req.body.stock,
+      description: req.body.description,
+    });
+
     const newProduct = await product.save();
     res.status(201).json(newProduct);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    console.error("Error creating product:", error);
+    res.status(400).json({
+      message: "Error creating product",
+      error: error.message,
+    });
   }
 });
 
@@ -117,7 +148,11 @@ router.put("/:id", async (req, res) => {
     const updatedProduct = await product.save();
     res.status(200).json(updatedProduct);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    console.error("Error updating product:", error);
+    res.status(400).json({
+      message: "Error updating product",
+      error: error.message,
+    });
   }
 });
 
@@ -131,7 +166,11 @@ router.delete("/:id", async (req, res) => {
     await product.deleteOne();
     res.status(200).json({ message: "Product deleted successfully" });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Error deleting product:", error);
+    res.status(500).json({
+      message: "Error deleting product",
+      error: error.message,
+    });
   }
 });
 
