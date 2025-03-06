@@ -26,26 +26,49 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // Routes
 app.use("/api/products", productRoutes);
 
-// MongoDB Connection with timeout and retry options
+// MongoDB Connection with caching
+let cachedDb = null;
+
 const connectDB = async () => {
+  if (cachedDb) {
+    console.log("Using cached database connection");
+    return cachedDb;
+  }
+
   try {
     const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
-      socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
       maxPoolSize: 10,
       minPoolSize: 5,
       retryWrites: true,
       retryReads: true,
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
     });
+
     console.log(`MongoDB Connected: ${conn.connection.host}`);
+    cachedDb = conn;
+    return conn;
   } catch (error) {
     console.error("MongoDB connection error:", error);
-    process.exit(1);
+    throw error;
   }
 };
 
-// Connect to MongoDB
-connectDB();
+// Connect to MongoDB before handling any requests
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    console.error("Database connection error:", error);
+    res.status(500).json({
+      message: "Database connection error",
+      error: error.message,
+    });
+  }
+});
 
 // Basic route
 app.get("/", (req, res) => {
@@ -55,32 +78,18 @@ app.get("/", (req, res) => {
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ message: "Something went wrong!" });
+  res.status(500).json({
+    message: "Something went wrong!",
+    error: err.message,
+  });
 });
 
-// For Vercel deployment
+// For local development
 if (process.env.NODE_ENV !== "production") {
-  // Start server with port conflict handling
-  const startServer = async () => {
-    const PORT = process.env.PORT || 3000;
-
-    try {
-      app.listen(PORT, () => {
-        console.log(`Server is running on port ${PORT}`);
-      });
-    } catch (error) {
-      if (error.code === "EADDRINUSE") {
-        console.log(`Port ${PORT} is busy, trying ${PORT + 1}`);
-        app.listen(PORT + 1, () => {
-          console.log(`Server is running on port ${PORT + 1}`);
-        });
-      } else {
-        console.error("Server error:", error);
-      }
-    }
-  };
-
-  startServer();
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
 }
 
 // Export for Vercel
