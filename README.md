@@ -23,6 +23,7 @@ A RESTful API for managing product inventory built with Node.js, Express, and Mo
 ## Installation
 
 1. Clone the repository:
+   Github Link: https://github.com/najmulhasan/crud-product-inventory-api
 
 ```bash
 git clone <your-repository-url>
@@ -45,6 +46,8 @@ NODE_ENV=development
 
 ## Running the Application
 
+production Link: https://crud-product-inventory-api-hasannazmul.vercel.app/
+
 ### Development Mode
 
 ```bash
@@ -52,6 +55,8 @@ npm run dev
 ```
 
 ### Production Mode
+
+nodemon app.js
 
 ```bash
 npm start
@@ -62,6 +67,8 @@ npm start
 ### Products
 
 #### Get All Products
+
+https://crud-product-inventory-api-hasannazmul.vercel.app/api/products/
 
 - **URL**: `/api/products`
 - **Method**: `GET`
@@ -76,6 +83,8 @@ npm start
   - `sort` (optional): Sort by field (prefix with - for descending order)
 
 #### Get Single Product
+
+https://crud-product-inventory-api-hasannazmul.vercel.app/api/products/67c9863e573736ea8760b92f
 
 - **URL**: `/api/products/:id`
 - **Method**: `GET`
